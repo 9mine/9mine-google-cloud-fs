@@ -28,18 +28,19 @@ files:
             echo new id is $var
             echo hostname is `{os hostname}
             (key project zone) = `{echo ${rget data}} 
-            echo $project
+            echo $project > /dev/sysname
             echo $zone
-            mkdir -p /host/$var
-            `{os /bin/bash -c 'mkdir -p /accounts/'^$var^''}
+            `{os /bin/bash -c 'mkdir -p /accounts/'^$var}
             `{os /bin/bash -c 'echo '^$key^' | base64 -d > /accounts/'^$var^'/key'}
             `{os /bin/bash -c 'gcloud auth activate-service-account --key-file /accounts/'^$var^'/key --quiet'}
-            `{os /bin/bash -c 'cat /accounts/'^$var^'/key | jq .client_email > /accounts/'^$var^'/email'}
+            `{os /bin/bash -c 'cat /accounts/'^$var^'/key | jq -r .client_email > /accounts/'^$var^'/email'}
             `{os /bin/bash -c 'echo '^$project^' > /accounts/'^$var^'/project'}
             `{os /bin/bash -c 'echo '^$zone^' > /accounts/'^$var^'/zone'}
-            sh -n -c 'os execfuse-static /execfuse-fs /usr/inferno-os/host/$var'
-            grid/reglisten -A -r description 'user id is $var' tcp!*!2000 { export /host/^$var & } &
+            grid/reglisten -A -r description 'user id is '^$var tcp!*!^$port2 { export /exprt/fs/^$var & } &
+            port2=${expr $port2 1 +}
             }
         chmod a+rwx $GCLOUD_DIR^/gcloud
+        mkdir -p /exprt/fs
+        sh -n -c 'os execfuse-static /execfuse-fs /usr/inferno-os/exprt/fs'
         echo --- after file2chan
         listen -A -t 'tcp!*!'$port { export /tmp/gcloud & } &
