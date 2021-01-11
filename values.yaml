@@ -60,9 +60,11 @@ fs: |
                     sh: gcloud compute instances describe "${compute_name}" --account=`cat /accounts/${id}/email` --project=`cat /accounts/${id}/project` --zone=`cat /accounts/${id}/zone` --format=json | jq '.'${attribute}''
                     getattr: 
                     sh: *file
-
+storage: null 
 files:
-    profile: 
+    profile:
+      path: /usr/inferno-os/lib/sh/profile 
+      data: |
         load file2chan
         load std
         ndb/cs
