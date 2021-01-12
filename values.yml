@@ -1,3 +1,23 @@
+image: 
+  repository: 9mine/9mine-google-cloud-fs
+  tag: "main"
+  pullPolicy: Always
+
+initContainerImage:
+  repository: 9mine/execfuse-jinja2
+  tag: "master"
+  pullPolicy: Always
+
+securityContext: 
+  privileged: true
+  capabilities:
+    add:
+      - SYS_ADMIN
+
+service:
+  type: ClusterIP
+  port: 2700
+
 fs: |
     {% include './common.j2' %} 
     fs:
@@ -60,52 +80,47 @@ fs: |
                     sh: gcloud compute instances describe "${compute_name}" --account=`cat /accounts/${id}/email` --project=`cat /accounts/${id}/project` --zone=`cat /accounts/${id}/zone` --format=json | jq '.'${attribute}''
                     getattr: 
                     sh: *file
-storage: null 
-files:
-    profile:
-      path: /usr/inferno-os/lib/sh/profile 
-      data: |
-        load file2chan
-        load std
-        ndb/cs
-        test -d /mnt/registry || mkdir -p /mnt/registry
+profile: |
+    echo --- start of profile loading ---
+    load file2chan
+    load std
+    ndb/cs
+    for host_var in `{ os env } { '{'$host_var'}' }
+    
+    dir = $EXPORT_PATH
+    port = $NINEP_PUBLIC_PORT
+    echo $NINEP_PUBLIC_HOST > /dev/sysname 
 
-        GCLOUD_DIR = /tmp/gcloud/cmd
-        mount -A tcp!registry.dev.metacoma.io!30099 /mnt/registry
-        test -d $GCLOUD_DIR || mkdir -p $GCLOUD_DIR
-        chmod a+rwx $GCLOUD_DIR
-        echo --- you are here
-        dir = /
-        port = 1917
-        port2 = 2000
-        echo --- after ports
+    test -d /mnt/registry || mkdir -p /mnt/registry
+    mount -A tcp!registry!registry /mnt/registry
 
+    GCLOUD_DIR = /tmp/gcloud/cmd
+    test -d $GCLOUD_DIR || mkdir -p $GCLOUD_DIR
+    chmod a+rwx $GCLOUD_DIR
+    load mpexpr
+    fs_port = ${expr $NINEP_PUBLIC_PORT 1 +}
 
-        file2chan $GCLOUD_DIR^/gcloud {
-            if {~ ${rget offset} 0} {
-                cat $output_file | putrdata
-            } {
-                rread ''
-            }
-            } {
-            load mpexpr
-            var=${expr 10 rand}
-            echo new id is $var
-            echo hostname is `{os hostname}
-            (key project zone) = `{echo ${rget data}} 
-            echo $project > /dev/sysname
-            echo $zone
-            `{os /bin/bash -c 'mkdir -p /accounts/'^$var}
-            `{os /bin/bash -c 'echo '^$key^' | base64 -d > /accounts/'^$var^'/key'}
-            `{os /bin/bash -c 'gcloud auth activate-service-account --key-file /accounts/'^$var^'/key --quiet'}
-            `{os /bin/bash -c 'cat /accounts/'^$var^'/key | jq -r .client_email > /accounts/'^$var^'/email'}
-            `{os /bin/bash -c 'echo '^$project^' > /accounts/'^$var^'/project'}
-            `{os /bin/bash -c 'echo '^$zone^' > /accounts/'^$var^'/zone'}
-            grid/reglisten -A -r description 'user id is '^$var tcp!*!^$port2 { export /exprt/fs/^$var & } &
-            port2=${expr $port2 1 +}
-            }
-        chmod a+rwx $GCLOUD_DIR^/gcloud
-        mkdir -p /exprt/fs
-        sh -n -c 'os execfuse-static /execfuse-fs /usr/inferno-os/exprt/fs'
-        echo --- after file2chan
-        listen -A -t 'tcp!*!'$port { export /tmp/gcloud & } &
+    file2chan $GCLOUD_DIR^/gcloud {} {
+        load mpexpr
+        var=${expr 10 rand}
+
+        echo new id is $var
+        echo hostname is `{os hostname}
+
+        (key project zone) = `{echo ${rget data}} 
+
+        `{os /bin/bash -c 'mkdir -p /accounts/'^$var}
+        `{os /bin/bash -c 'echo '^$key^' | base64 -d > /accounts/'^$var^'/key'}
+        `{os /bin/bash -c 'gcloud auth activate-service-account --key-file /accounts/'^$var^'/key --quiet'}
+        `{os /bin/bash -c 'cat /accounts/'^$var^'/key | jq -r .client_email > /accounts/'^$var^'/email'}
+        `{os /bin/bash -c 'echo '^$project^' > /accounts/'^$var^'/project'}
+        `{os /bin/bash -c 'echo '^$zone^' > /accounts/'^$var^'/zone'}
+        
+        grid/reglisten -A -r description 'user id is '^$var tcp!*!^$fs_port { export $dir^/^$var & } &
+        fs_port=${expr $fs_port 1 +}
+    }
+        
+    grid/reglisten -A -r description ${quote $NINEP_DESCRIPTION} 'tcp!*!'^$port { export $GCLOUD_DIR & } &
+        
+    test -n $status && os pkill -9 emu-g
+    echo --- end of profile loading ---
