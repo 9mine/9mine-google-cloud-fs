@@ -17,6 +17,10 @@ securityContext:
 service:
   type: ClusterIP
   port: 2700
+  
+ClusterIPRange:
+    from: 2701
+    to: 2720
 
 fs: |
     {% include './common.j2' %} 
