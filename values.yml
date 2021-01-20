@@ -22,68 +22,67 @@ ClusterIPRange:
     from: 2701
     to: 2720
 
+description: "googlecloudfs"
+
 fs: |
-    {% include './common.j2' %} 
+    {% include './common.j2' %}
     fs:
     # root
     "/":
-        readdir: 
+      readdir: 
         sh: ls /accounts
-        getattr:
+      getattr:
         sh: *dir 
         # /<id>
-        "/[0-9]+":
+      "/[0-9]+":
         name: id
         readdir: 
-            list: 
-            - compute
+          list: 
+          - compute
         getattr: 
             sh: *dir
         # /<id>/compute
         "/compute":
-            readdir:
-                list: 
-                - instances
-            getattr:
+          readdir:
+            list: 
+            - instances
+          getattr:
             sh: *dir
-
             # /<id>/compute/instances
-            "/instances":
+          "/instances":
             readdir:
-                list: 
-                - list
-                - describe 
+              list: 
+              - list
+              - describe 
             getattr:
-                sh: *dir 
-
+              sh: *dir 
             # /<id>/compute/instances/list
             "/list":
-                read_file:
+              read_file:
                 sh:  gcloud compute instances list --account=`cat /accounts/${id}/email` --project=`cat /accounts/${id}/project` --zones=`cat /accounts/${id}/zone`
-                getattr: 
+              getattr: 
                 sh: *file 
             # /<id>/compute/instances/describe   
             "/describe":
-                getattr: 
+              getattr: 
                 sh: *dir
-                readdir: 
+              readdir: 
                 sh: gcloud compute instances list --account=`cat /accounts/${id}/email` --project=`cat /accounts/${id}/project` --zones=`cat /accounts/${id}/zone` --format=json | jq -r '.[].name'
-                
                 # /<id>/compute/instances/describe/<compute_name>
                 "/[a-z0-9_-]+":
                 name: compute_name
                 readdir: 
-                    sh: gcloud compute instances describe ${compute_name} --account=`cat /accounts/${id}/email` --project=`cat /accounts/${id}/project` --zone=`cat /accounts/${id}/zone` --format=json | jq -r 'keys[]' 
+                  sh: gcloud compute instances describe ${compute_name} --account=`cat /accounts/${id}/email` --project=`cat /accounts/${id}/project` --zone=`cat /accounts/${id}/zone` --format=json | jq -r 'keys[]' 
                 getattr:
-                    sh: *dir
-
+                  sh: *dir
                 # /<id>/compute/instances/describe/<compute_name>/<attribute>
                 "/[a-zA-Z0-9_-]+":
-                    name: attribute
-                    read_file: 
+                  name: attribute
+                  read_file: 
                     sh: gcloud compute instances describe "${compute_name}" --account=`cat /accounts/${id}/email` --project=`cat /accounts/${id}/project` --zone=`cat /accounts/${id}/zone` --format=json | jq '.'${attribute}''
-                    getattr: 
+                  getattr: 
                     sh: *file
+
 profile: |
     echo --- start of profile loading ---
     load file2chan

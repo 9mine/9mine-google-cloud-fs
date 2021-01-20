@@ -1,0 +1,73 @@
+image: 
+  repository: 9mine/9mine-google-cloud-fs
+  tag: "main"
+  pullPolicy: Always
+
+initContainerImage:
+  repository: 9mine/execfuse-jinja2
+  tag: "master"
+  pullPolicy: Always
+
+securityContext: 
+  privileged: true
+  capabilities:
+    add:
+      - SYS_ADMIN
+
+service:
+  type: ClusterIP
+  port: 2700
+  
+ClusterIPRange:
+    from: 2701
+    to: 2720
+
+description: "googlecloudfs"
+
+fs: |
+    {% filter indent() -%}{% include 'fs.yml'%}
+    {%- endfilter %}
+
+profile: |
+    echo --- start of profile loading ---
+    load file2chan
+    load std
+    ndb/cs
+    for host_var in `{ os env } { '{'$host_var'}' }
+    
+    dir = $EXPORT_PATH
+    port = $NINEP_PUBLIC_PORT
+    echo $NINEP_PUBLIC_HOST > /dev/sysname 
+
+    test -d /mnt/registry || mkdir -p /mnt/registry
+    mount -A tcp!registry!registry /mnt/registry
+
+    GCLOUD_DIR = /tmp/gcloud/cmd
+    test -d $GCLOUD_DIR || mkdir -p $GCLOUD_DIR
+    chmod a+rwx $GCLOUD_DIR
+    load mpexpr
+    fs_port = ${expr $NINEP_PUBLIC_PORT 1 +}
+
+    file2chan $GCLOUD_DIR^/gcloud {} {
+        load mpexpr
+        var=${expr 10 rand}
+
+        echo new id is $var
+        echo hostname is `{os hostname}
+
+        (key project zone) = `{echo ${rget data}} 
+
+        `{os /bin/bash -c 'mkdir -p /accounts/'^$var}
+        `{os /bin/bash -c 'echo '^$key^' | base64 -d > /accounts/'^$var^'/key'}
+        `{os /bin/bash -c 'gcloud auth activate-service-account --key-file /accounts/'^$var^'/key --quiet'}
+        `{os /bin/bash -c 'cat /accounts/'^$var^'/key | jq -r .client_email > /accounts/'^$var^'/email'}
+        `{os /bin/bash -c 'echo '^$project^' > /accounts/'^$var^'/project'}
+        `{os /bin/bash -c 'echo '^$zone^' > /accounts/'^$var^'/zone'}
+        
+        grid/reglisten -A -r description 'user id is '^$var tcp!*!^$fs_port { export $dir^/^$var & } &
+        fs_port=${expr $fs_port 1 +}
+    }
+        
+    grid/reglisten -A -r description ${quote $NINEP_DESCRIPTION} 'tcp!*!'^$port { export $GCLOUD_DIR & }
+    test -n $status && os pkill -9 emu-g
+    echo --- end of profile loading ---

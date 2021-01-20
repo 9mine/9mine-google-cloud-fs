@@ -1,0 +1,57 @@
+{% raw %}{% include './common.j2' %}{% endraw %}
+fs:
+# root
+"/":
+  readdir: 
+    sh: ls /accounts
+  getattr:
+    sh: *dir 
+    # /<id>
+  "/[0-9]+":
+    name: id
+    readdir: 
+      list: 
+      - compute
+    getattr: 
+        sh: *dir
+    # /<id>/compute
+    "/compute":
+      readdir:
+        list: 
+        - instances
+      getattr:
+        sh: *dir
+        # /<id>/compute/instances
+      "/instances":
+        readdir:
+          list: 
+          - list
+          - describe 
+        getattr:
+          sh: *dir 
+        # /<id>/compute/instances/list
+        "/list":
+          read_file:
+            sh:  gcloud compute instances list --account=`cat /accounts/${id}/email` --project=`cat /accounts/${id}/project` --zones=`cat /accounts/${id}/zone`
+          getattr: 
+            sh: *file 
+        # /<id>/compute/instances/describe   
+        "/describe":
+          getattr: 
+            sh: *dir
+          readdir: 
+            sh: gcloud compute instances list --account=`cat /accounts/${id}/email` --project=`cat /accounts/${id}/project` --zones=`cat /accounts/${id}/zone` --format=json | jq -r '.[].name'
+            # /<id>/compute/instances/describe/<compute_name>
+            "/[a-z0-9_-]+":
+            name: compute_name
+            readdir: 
+              sh: gcloud compute instances describe ${compute_name} --account=`cat /accounts/${id}/email` --project=`cat /accounts/${id}/project` --zone=`cat /accounts/${id}/zone` --format=json | jq -r 'keys[]' 
+            getattr:
+              sh: *dir
+            # /<id>/compute/instances/describe/<compute_name>/<attribute>
+            "/[a-zA-Z0-9_-]+":
+              name: attribute
+              read_file: 
+                sh: gcloud compute instances describe "${compute_name}" --account=`cat /accounts/${id}/email` --project=`cat /accounts/${id}/project` --zone=`cat /accounts/${id}/zone` --format=json | jq '.'${attribute}''
+              getattr: 
+                sh: *file
