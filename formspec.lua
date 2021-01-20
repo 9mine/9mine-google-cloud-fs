@@ -4,7 +4,7 @@ credentials_event = function(player, formname, fields)
         if fields.quit then return end
         if fields.send then
             minetest.show_formspec(player_name, "core:none",
-                                   table.concat({"formspec_version[4]", "size[8,1,false]", "hypertext[0, 0.2; 8, 1;; <bigger><center>Credentials sending . . .<center><bigger>]"}, ""))
+                table.concat({"formspec_version[4]", "size[8,1,false]", "hypertext[0, 0.2; 8, 1;; <bigger><center>Credentials sending . . .<center><bigger>]"}, ""))
             local player_name = player:get_player_name()
             local conn = connections:get_connection(player_name, fields.service_addr, true)
             local content = table.concat({fields.key, fields.project, fields.zone}, " ")
