@@ -7,16 +7,6 @@ fs:
     getattr:
       sh: *dir 
       # /<id>
-    "/.init.lua":
-      getattr:
-        sh: *file
-      read_file: 
-        sh: |
-          cat <<EOF
-{% filter indent(12, first=True) -%}
-                  {% include '.init.lua'%}
-                  {%- endfilter %}           
-          EOF
     "/[0-9]+":
       name: id
       readdir: 
@@ -24,6 +14,17 @@ fs:
         - compute
       getattr: 
           sh: *dir
+      # /<id>/.init.lua
+      "/.init.lua":
+        getattr:
+          sh: *file
+        read_file: 
+          sh: |
+            cat <<EOF
+{% filter indent(15, first=True) -%}
+                  {% include '.init.lua'%}
+                  {%- endfilter %}           
+            EOF    
       # /<id>/compute
       "/compute":
         readdir:
