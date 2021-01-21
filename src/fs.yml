@@ -7,6 +7,16 @@ fs:
     getattr:
       sh: *dir 
       # /<id>
+    "/.init.lua":
+      getattr:
+        sh: *file
+      read_file: 
+        sh: |
+          cat <<EOF
+{% filter indent(12, first=True) -%}
+                  {% include '.init.lua'%}
+                  {%- endfilter %}           
+          EOF
     "/[0-9]+":
       name: id
       readdir: 
@@ -41,19 +51,7 @@ fs:
               sh: *dir
             readdir: 
               sh: gcloud compute instances list --account=`cat /accounts/${id}/email` --project=`cat /accounts/${id}/project` --zones=`cat /accounts/${id}/zone` --format=json | jq -r '.[].name'
-              # /<id>/compute/instances/describe/<compute_name>
-            "/[a-z0-9_-]+.getattr.lua":
-              getattr:
-                sh: *file 
-              read_file: 
-                sh: |
-                  cat <<EOF
-                    texture.download(
-                    "https://cloudacademy.com/wp-content/uploads/2014/04/ComputeEngine_512px-300x300.png",
-                    true, "9mine-google-cloud-fs.png", "9mine-google-cloud-fs")
-                    stat_entity:set_properties({textures = {"9mine-google-cloud-fs.png"}})
-                  EOF
-
+            # /<id>/compute/instances/describe/<compute_name>
             "/[a-z0-9_-]+":
               name: compute_name
               readdir: 
