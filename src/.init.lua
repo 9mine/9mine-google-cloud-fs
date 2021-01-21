@@ -13,4 +13,4 @@ local function set_texture(entry, entity)
         })
     end
 end
-register.add_texture_handler("9mine-google-cloud-fs-set-texture", set_texture)
+register.add_texture_handler(init_path .. "9mine-google-cloud-fs-set-texture", set_texture)
