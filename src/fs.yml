@@ -23,8 +23,10 @@ fs:
             cat <<EOF
 {% filter indent(15, first=True) -%}
                   {% include '.init.lua'%}
-                  {%- endfilter %}           
-            EOF    
+                  {%- endfilter %}      
+
+            EOF
+            
       # /<id>/compute
       "/compute":
         readdir:
