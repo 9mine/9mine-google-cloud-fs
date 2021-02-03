@@ -29,42 +29,106 @@ fs: |
     fs:
       # root
       "/":
+        <<: *is_dir
         readdir: 
           sh: ls /accounts
-        getattr:
-          sh: *dir 
           # /<id>
         "/[0-9]+":
+          <<: *is_dir
           name: id
           readdir: 
             list: 
             - compute
-          getattr: 
-              sh: *dir
-          # /<id>/.init.lua
-          "/.init.lua":
-            getattr:
-              sh: *file
+          # /<id>/.console.lua
+          "/.console.lua":
+            <<: *is_file
             read_file: 
               sh: |
                 cat <<EOF
-                   local function set_texture(entry, entity)
-                       local prefix = init_path:match("/$") and init_path:sub(1, -2) or init_path
-                       if not prefix then
-                           return
-                       end
-                       if entry.platform_string == prefix .. "/compute/instances/describe" then
-                           texture.download("https://cloudacademy.com/wp-content/uploads/2014/04/ComputeEngine_512px-300x300.png", true,
-                               "9mine-google-cloud-fs.png", "9mine-google-cloud-fs")
-                           entity:set_properties({
-                               visual = "cube",
-                               textures = {"9mine-google-cloud-fs.png", "9mine-google-cloud-fs.png", "9mine-google-cloud-fs.png",
-                                           "9mine-google-cloud-fs.png", "9mine-google-cloud-fs.png", "9mine-google-cloud-fs.png"}
-                           })
+                   class "gcloud_cmdchan"("cmdchan")
+
+                   function gcloud_cmdchan:gcloud_cmdchan(connection, cmdchan_path)
+                       cmdchan:cmdchan(connection, cmdchan_path)
+                   end
+
+                   function gcloud_cmdchan:write(command)
+                       local conn = self.connection.conn
+                       local f = conn:newfid()
+                       print("Write " .. command .. " to " .. self.cmdchan_path)
+                       conn:walk(conn.rootfid, f, self.cmdchan_path)
+                       conn:open(f, 1)
+                       local buf = data.new(command)
+                       conn:write(f, 0, buf)
+                       conn:clunk(f)
+                   end
+
+                   function gcloud_cmdchan:execute(command, location)
+                       local tmp_file = "/n/cmdchan/cmdchan_output"
+                       pcall(gcloud_cmdchan.write, self, command, location)
+                       return select(2, pcall(gcloud_cmdchan.read, self, tmp_file))
+                   end
+                   connection:set_cmdchan(gcloud_cmdchan(connection, core_conf:get("cmdchan_path")))
+                   local tx_name = "9mine-google-cloud-fs.png"
+                   texture.download("https://cloudacademy.com/wp-content/uploads/2014/04/ComputeEngine_512px-300x300.png", true,
+                       "9mine-google-cloud-fs.png", "9mine-google-cloud-fs")
+                   entity:set_properties({
+                       visual = "cube",
+                       textures = {tx_name, tx_name, tx_name, tx_name, tx_name, tx_name}
+                   })
+                   entity:get_luaentity().on_punch = function(self, player)
+                       local p = self.object:get_pos()
+                       local pos = minetest.serialize(p)
+                       local request = ""
+                       minetest.show_formspec(player:get_player_name(), "gcloud:console",
+                           table.concat({"formspec_version[4]", "size[13,13,false]",
+                                         "textarea[0.5,0.5;12.0,10;;;" .. minetest.formspec_escape(self.output) .. "]",
+                                         "field[0.5,10.5;12,1;input;;]", "field_close_on_enter[input;false]",
+                                         "button[10,11.6;2.5,0.9;send;send]",
+                                         "field[13,13;0,0;entity_pos;;" .. minetest.formspec_escape(pos) .. "]"}, ""))
+                   end
+
+                   local function gcloud_console(player, formname, fields)
+                       if formname == "gcloud:console" then
+                           if not (fields.key_enter or fields.send) then
+                               return
+                           end
+                           local player_name = player:get_player_name()
+                           local pos = minetest.deserialize(fields.entity_pos)
+                           local lua_entity = select(2, next(minetest.get_objects_inside_radius(pos, 0.5))):get_luaentity()
+                           local cmdchan = connections:get_connection(player_name, lua_entity.addr):get_cmdchan()
+                           cmdchan:write(fields.input:gsub("^gcloud ", ""))
+                           minetest.show_formspec(player_name, "gcloud:console",
+                               table.concat({"formspec_version[4]", "size[13,13,false]", "textarea[0.5,0.5;12.0,10;;;",
+                                             minetest.formspec_escape("Please, wait for response"), "]", "field[0.5,10.5;12,1;input;;]",
+                                             "field_close_on_enter[input;false]"}, ""))
+                           minetest.after(3, function()
+                               local function show_output()
+                                   local result, response = pcall(cmdchan.read, cmdchan, "/n/cmdchan/cmdchan_output")
+                                   if not result then
+                                       minetest.after(3, show_output)
+                                       return
+                                   end
+                                   lua_entity.output = fields.input .. ": \n" .. response .. "\n" .. lua_entity.output
+                                   minetest.show_formspec(player_name, "gcloud:console",
+                                       table.concat({"formspec_version[4]", "size[13,13,false]", "textarea[0.5,0.5;12.0,10;;;",
+                                                     minetest.formspec_escape(lua_entity.output), "]", "field[0.5,10.5;12,1;input;;]",
+                                                     "field_close_on_enter[input;false]", "button[10,11.6;2.5,0.9;send;send]",
+                                                     "field[13,13;0,0;entity_pos;;", minetest.formspec_escape(fields.entity_pos), "]"}, ""))
+                               end
+                               show_output()
+                           end)
                        end
                    end
-                   register.add_texture_handler(init_path .. "9mine-google-cloud-fs-set-texture", set_texture)
 
+                   register.add_form_handler("gcloud:console", gcloud_console)
+           
+                EOF
+          # /<id>/.init.lua
+          "/.init.lua":
+            <<: *is_file
+            read_file: 
+              sh: |
+                cat <<EOF
                    class "gcloud_cmdchan"("cmdchan")
 
                    function gcloud_cmdchan:gcloud_cmdchan(connection, cmdchan_path)
@@ -88,8 +152,23 @@ fs: |
                        return select(2, pcall(gcloud_cmdchan.read, self, tmp_file))
                    end
                    platform.cmdchan = gcloud_cmdchan(platform.connection, core_conf:get("cmdchan_path"))
-
-                   local function gcloud_message_handler(player_name, message)
+                   local function set_texture(entry, entity)
+                       local prefix = init_path:match("/$") and init_path:sub(1, -2) or init_path
+                       if not prefix then
+                           return
+                       end
+                       if entry.platform_string == prefix .. "/compute/instances/describe" then
+                           texture.download("https://cloudacademy.com/wp-content/uploads/2014/04/ComputeEngine_512px-300x300.png", true,
+                               "9mine-google-cloud-fs.png", "9mine-google-cloud-fs")
+                           entity:set_properties({
+                               visual = "cube",
+                               textures = {"9mine-google-cloud-fs.png", "9mine-google-cloud-fs.png", "9mine-google-cloud-fs.png",
+                                           "9mine-google-cloud-fs.png", "9mine-google-cloud-fs.png", "9mine-google-cloud-fs.png"}
+                           })
+                       end
+                   end
+                   register.add_texture_handler(init_path .. "9mine-google-cloud-fs-set-texture", set_texture)
+                     local function gcloud_message_handler(player_name, message)
                        if message:match("^gcloud ") then
                            local player = minetest.get_player_by_name(player_name)
                            local player_graph = graphs:get_player_graph(player_name)
@@ -121,7 +200,6 @@ fs: |
 
                    register.add_message_handler(init_path .. "gcloud_message_handler", gcloud_message_handler)
           
-
                 EOF
           "/n":
             <<: *is_dir
@@ -145,45 +223,40 @@ fs: |
                 
           # /<id>/compute
           "/compute":
+            <<: *is_dir
             readdir:
               list: 
               - instances
-            getattr:
-              sh: *dir
               # /<id>/compute/instances
             "/instances":
+              <<: *is_dir
               readdir:
                 list: 
                 - list
                 - describe 
-              getattr:
-                sh: *dir 
               # /<id>/compute/instances/list
               "/list":
+                <<: *is_file
                 read_file:
                   sh:  gcloud compute instances list --account=`cat /accounts/${id}/email` --project=`cat /accounts/${id}/project` --zones=`cat /accounts/${id}/zone`
-                getattr: 
-                  sh: *file 
               # /<id>/compute/instances/describe   
               "/describe":
-                getattr: 
-                  sh: *dir
+                <<: *is_dir
                 readdir: 
                   sh: gcloud compute instances list --account=`cat /accounts/${id}/email` --project=`cat /accounts/${id}/project` --zones=`cat /accounts/${id}/zone` --format=json | jq -r '.[].name'
                 # /<id>/compute/instances/describe/<compute_name>
                 "/[a-z0-9_-]+":
+                  <<: *is_dir
                   name: compute_name
                   readdir: 
                     sh: gcloud compute instances describe ${compute_name} --account=`cat /accounts/${id}/email` --project=`cat /accounts/${id}/project` --zone=`cat /accounts/${id}/zone` --format=json | jq -r 'keys[]' 
-                  getattr:
-                    sh: *dir
                   # /<id>/compute/instances/describe/<compute_name>/<attribute>
                   "/[a-zA-Z0-9_-]+":
                     name: attribute
                     read_file: 
                       sh: gcloud compute instances describe "${compute_name}" --account=`cat /accounts/${id}/email` --project=`cat /accounts/${id}/project` --zone=`cat /accounts/${id}/zone` --format=json | jq '.'${attribute}''
-                    getattr: 
-                      sh: *file
+                    <<: *is_file
+
 
 profile: |
     echo --- start of profile loading ---

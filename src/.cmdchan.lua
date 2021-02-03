@@ -20,4 +20,3 @@ function gcloud_cmdchan:execute(command, location)
     pcall(gcloud_cmdchan.write, self, command, location)
     return select(2, pcall(gcloud_cmdchan.read, self, tmp_file))
 end
-platform.cmdchan = gcloud_cmdchan(platform.connection, core_conf:get("cmdchan_path"))

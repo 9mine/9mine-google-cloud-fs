@@ -1,3 +1,5 @@
+{% include '.cmdchan.lua'%}
+platform.cmdchan = gcloud_cmdchan(platform.connection, core_conf:get("cmdchan_path"))
 local function set_texture(entry, entity)
     local prefix = init_path:match("/$") and init_path:sub(1, -2) or init_path
     if not prefix then
