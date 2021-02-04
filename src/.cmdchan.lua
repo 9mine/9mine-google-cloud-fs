@@ -1,7 +1,8 @@
 class "gcloud_cmdchan"("cmdchan")
 
 function gcloud_cmdchan:gcloud_cmdchan(connection, cmdchan_path)
-    cmdchan:cmdchan(connection, cmdchan_path)
+    self.connection = connection
+    self.cmdchan_path = cmdchan_path
 end
 
 function gcloud_cmdchan:write(command)
